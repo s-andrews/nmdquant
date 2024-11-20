@@ -14,6 +14,9 @@ def main():
     for bam in options.bam:
         quantitate_bam(bam,splices)
 
+
+    breakpoint()
+
     write_output(splices, options.bam, options.outfile)
 
 def write_output(splices, files, outfile):
@@ -21,7 +24,45 @@ def write_output(splices, files, outfile):
 
 
 def quantitate_bam(bam, splices):
-    pass
+    # We first need to add a zero value to every splice in the dataset
+    # then we can parse through the file and increment every time we
+    # find a splice which is listed in the file.
+    for splice in splices:
+        splices[splice]["quantitations"].append(0)
+
+    inbam = pysam.AlignmentFile(bam,"rb")
+
+#### TESTING ONLY
+#    for read in inbam.fetch(until_eof=True):
+    for read in inbam.fetch("1",1,248956422):
+        # We don't want non unique mappings
+        if read.mapping_quality < 20:
+            continue
+
+        splice_lengths = []
+        for operation,operation_length in read.cigartuples:
+            if operation == 3:
+                splice_lengths.append(operation_length)
+
+        if not splice_lengths:
+            continue
+
+        blocks = read.blocks
+        for i in range(1,len(blocks)):
+            dist = blocks[i][0] - blocks[i-1][1]
+            if dist == splice_lengths[0]:
+                splice_lengths.pop(0)
+                intron = f"{read.reference_name}:{blocks[i-1][1]+1}-{blocks[i][0]}"
+                if intron in splices:
+                    splices[intron]["quantitations"][-1] += 1
+
+                if not splice_lengths:
+                    break
+                
+        # if splice_lengths:
+        #     print("Had left over splice lengths")
+        #     breakpoint()
+
 
 def read_splice_sites(file):
     infh = None
@@ -124,17 +165,17 @@ def read_splice_sites(file):
         for i in range(1,len(transcript_exons)):
             is_nmd = False
             if transcripts[transcipt_id]['direction'] == "+":
-                intron = f"{transcripts[transcipt_id]['chromosome']}:{transcript_exons[i-1][1]+1}-{transcript_exons[i][0]-1}:{transcripts[transcipt_id]['direction']}"
+                intron = f"{transcripts[transcipt_id]['chromosome']}:{transcript_exons[i-1][1]+1}-{transcript_exons[i][0]-1}"
                 if cds_end is None or transcript_exons[i-1][1]+1 > cds_end:
                     is_nmd = True
 
             else:
-                intron = f"{transcripts[transcipt_id]['chromosome']}:{transcript_exons[i][1]+1}-{transcript_exons[i-1][0]-1}:{transcripts[transcipt_id]['direction']}"
+                intron = f"{transcripts[transcipt_id]['chromosome']}:{transcript_exons[i][1]+1}-{transcript_exons[i-1][0]-1}"
                 if cds_end is None or transcript_exons[i][1]-1 < cds_end:
                     is_nmd = True
 
             if not intron in splice_sites:
-                splice_sites[intron] = {"nmd":is_nmd}
+                splice_sites[intron] = {"nmd":is_nmd, "direction":transcripts[transcipt_id]['direction'], "quantitations":[]}
 
             if not is_nmd:
                 splice_sites[intron]["nmd"] = False        
