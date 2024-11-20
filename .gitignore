@@ -1,3 +1,9 @@
+# Ignore all test data
+test/
+
+# Ignore the venv
+venv/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
