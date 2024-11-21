@@ -64,4 +64,5 @@ Downstream Analysis
 
 The end point of the program is the table of counts for each annotated intron.  Downstream analysis of these values can be performed in any suitable environment.  One example of such an analysis in R is given in the ```analysis``` subfolder of this repository.
 
+[View Example Analysis](https://htmlpreview.github.io/?https://raw.githubusercontent.com/s-andrews/nmdquant/refs/heads/main/analysis/nmd_quantitation_analysis.html)
 
