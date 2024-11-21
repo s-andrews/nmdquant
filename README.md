@@ -3,7 +3,7 @@ Quantitation of Nonsense Mediated Decay
 
 [Nonsense Mediated Decay](https://en.wikipedia.org/wiki/Nonsense-mediated_decay), or NMD for short, is a surveilance mechanims in cells which identifies and removes protein coding RNA molecules which contain a premature termination codon.  Any transcript which contains splice junctions, and where the coding sequence within the transcript does not extend beyond the final splice junction is susceptible to degradation via this mechanism.
 
-![NMD illustration](https://en.wikipedia.org/wiki/Nonsense-mediated_decay#/media/File:NMD_-_Nonsense-mediated_decay.png)
+![NMD illustration](https://upload.wikimedia.org/wikipedia/commons/5/52/NMD_-_Nonsense-mediated_decay.png)
 
 Under some circumstances this process may be inhibited, leading to an increase in the number of non-productive transcripts within the mRNA population.
 
