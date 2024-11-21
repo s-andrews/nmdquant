@@ -1,0 +1,263 @@
+---
+title: "NMD Quantiation"
+author: "Simon Andrews"
+format: 
+  html :
+    toc: true
+    embed-resources: true
+    df-print: paged
+---
+
+Introduction
+============
+
+This is an example of how to take the output of ```nmdquant``` and look at the nonsense mediated decay activity between two experimental conditions.
+
+The input data here is the output of running:
+
+```
+nmdquant.py --outfile nmd_quantiations.txt --nounmeasured Mus_musculus.GRCm39.113.gtf.gz *bam
+```
+
+..to quantify the per intron observations of NMD introns in a set of BAM files.  In this example the files come from oe of two conditions, a wild type and a knockdown of a gene likely to be involved in RNA processing, and therefore potentially influencing the level of effectiveness of nonsense mediated decay.
+
+Reading Data
+============
+
+```{r}
+#| warning: false
+#| message: false
+
+library(tidyverse)
+theme_set(theme_bw())
+library(ggbeeswarm)
+library(rstatix)
+
+read_delim("nmd_quantiations.txt") -> nmd_data
+
+head(nmd_data)
+```
+
+Restructuring 
+-------------
+
+We'll put this data into tidy format to make some of the normalisation easier.  We can also split out the condition and replicate
+
+```{r}
+nmd_data %>%
+  pivot_longer(
+    cols=Control1_rep1_GRCm39_hisat2.bam:last_col(),
+    names_to="filename",
+    values_to="count"
+  ) %>%
+  separate(filename, into=c("condition","replicate"), extra="drop", sep="_", remove = FALSE) -> nmd_long
+
+head(nmd_long)
+```
+
+Normalisation
+=============
+
+We want to have globally normalised log transformed values.
+
+```{r}
+nmd_long %>%
+  group_by(filename) %>%
+  mutate(
+    log2RPM = log2(count+1 / (sum(count)/1000000))
+  ) %>%
+  ungroup() -> nmd_long
+```
+
+Let's compare the distributions we get from this.
+
+```{r}
+nmd_long %>%
+  ggplot(aes(x=log2RPM, group=filename, colour=condition)) +
+  geom_density()
+```
+
+OK, pretty close.
+
+
+Plotting
+========
+
+NMD proportion
+--------------
+
+```{r}
+#| warning: false
+#| message: false
+
+nmd_long %>%
+  group_by(filename,condition,NMD) %>%
+  summarise(
+    count = sum(count)
+  ) %>%
+  ungroup() %>%
+  pivot_wider(
+    names_from=NMD,
+    values_from=count
+  ) %>%
+  mutate(
+    percentage_nmd = 100*`TRUE`/(`TRUE` + `FALSE`)
+  ) %>%
+  ggplot(aes(x=condition, y=percentage_nmd, colour=condition)) +
+  geom_beeswarm(size=4, cex=4, show.legend = FALSE) +
+  stat_summary(geom="crossbar", fun=mean) +
+  ggtitle("Proportion of NMD signal in different libraries")
+```
+
+Scatterplot
+-----------
+
+We can plot a scatterplot of control vs KD and highlight the NMD to see how they change in aggregate.
+
+```{r}
+nmd_long %>%
+  group_by(INTRON,NMD,GENE,condition) %>%
+  summarise(
+    log2RPM = mean(log2RPM)
+  ) %>%
+  ungroup() %>%
+  pivot_wider(
+    names_from=condition,
+    values_from=log2RPM
+  ) -> nmd_summarised_wide
+
+head(nmd_summarised_wide)
+
+```
+
+### Control1 vs KD1
+
+```{r fig.width=6, fig.height=5}
+nmd_summarised_wide %>%
+  arrange(NMD) %>%
+  ggplot(aes(x=Control1, y=KD1, colour=NMD)) +
+  geom_point(size=0.8) +
+  scale_colour_manual(values=c("grey","blue2")) +
+  geom_abline(slope=1, intercept=0)
+
+```
+
+### Control2 vs KD2
+
+```{r fig.width=6, fig.height=5}
+nmd_summarised_wide %>%
+  arrange(NMD) %>%
+  ggplot(aes(x=Control2, y=KD2, colour=NMD)) +
+  geom_point(size=0.8) +
+  scale_colour_manual(values=c("grey","blue2")) +
+  geom_abline(slope=1, intercept=0)
+
+```
+
+MA Plot
+-------
+
+We can plot a MA of control vs KD and highlight the NMD to see how they change in aggregate.
+
+### Control1 vs KD1
+
+```{r fig.width=7, fig.height=4}
+nmd_summarised_wide %>%
+  arrange(NMD) %>%
+  ggplot(aes(x=Control1+KD1, y=KD1-Control1, colour=NMD)) +
+  geom_point(size=0.8) +
+  scale_colour_manual(values=c("grey","blue2")) +
+  geom_hline(yintercept = 0)
+
+```
+
+### Control1 vs KD2
+
+```{r fig.width=7, fig.height=4}
+nmd_summarised_wide %>%
+  arrange(NMD) %>%
+  ggplot(aes(x=Control2+KD2, y=KD2-Control2, colour=NMD)) +
+  geom_point(size=0.8) +
+  scale_colour_manual(values=c("grey","blue2")) +
+  geom_hline(yintercept = 0)
+
+```
+
+
+
+Difference Distributions
+------------------------
+
+## Control1 vs KD1
+
+```{r fig.width=4, fig.height=5}
+nmd_summarised_wide %>%
+  mutate(KD_difference = KD1 - Control1) %>%
+  ggplot(aes(x=NMD, y=KD_difference)) +
+  geom_jitter(colour="grey", size=0.5) +
+  geom_violin(alpha=0, adjust=3) +
+  geom_boxplot(alpha=0, width=0.3) +
+  ggtitle("Knockdown differences WT1 vs KO1")
+```
+
+## Control2 vs KD2
+
+```{r fig.width=4, fig.height=5}
+nmd_summarised_wide %>%
+  mutate(KD_difference = KD2 - Control2) %>%
+  ggplot(aes(x=NMD, y=KD_difference)) +
+  geom_jitter(colour="grey", size=0.5) +
+  geom_violin(alpha=0, adjust=3) +
+  geom_boxplot(alpha=0, width=0.3) +
+  ggtitle("Knockdown differences WT2 vs KO2")
+```
+
+Statistics
+==========
+
+There are several ways to look at the statistics for this.
+
+
+Overall library percentages
+---------------------------
+
+```{r}
+nmd_long %>%
+  group_by(filename,condition,NMD) %>%
+  summarise(
+    count = sum(count)
+  ) %>%
+  ungroup() %>%
+  pivot_wider(
+    names_from=NMD,
+    values_from=count
+  ) %>%
+  mutate(
+    percentage_nmd = 100*`TRUE`/(`TRUE` + `FALSE`)
+  ) %>%
+  t_test(percentage_nmd~condition) %>%
+  filter((group1=="Control1" & group2=="KD1")|(group1=="Control2" & group2=="KD2")) %>%
+  select(group1,group2,p)
+```
+
+Distribution of differences
+---------------------------
+
+## Control1 vs KD1
+
+```{r fig.width=4, fig.height=5}
+nmd_summarised_wide %>%
+  mutate(KD_difference = KD1 - Control1) %>%
+  wilcox_test(KD_difference ~ NMD)
+```
+
+
+## Control2 vs KD2
+
+```{r fig.width=4, fig.height=5}
+nmd_summarised_wide %>%
+  mutate(KD_difference = KD2 - Control2) %>%
+  wilcox_test(KD_difference ~ NMD)
+```
+
+Both of these are highly significant, but we may be over-powered.
