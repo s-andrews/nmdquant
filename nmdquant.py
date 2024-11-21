@@ -14,16 +14,27 @@ def main():
     for bam in options.bam:
         quantitate_bam(bam,splices)
 
-
-    breakpoint()
-
     write_output(splices, options.bam, options.outfile)
 
+    print("Run complete")
+
 def write_output(splices, files, outfile):
-    pass
+    print("Writing output to",outfile)
+    with open(outfile,"wt",encoding="utf8") as out:
+        headers = ["INTRON","DIRECTION","GENE","NMD"]
+        headers.extend(files)
+
+        print("\t".join(headers), file=out)
+
+        for intron in splices.keys():
+            line = [intron,splices[intron]["direction"],"somegene",splices[intron]["nmd"]]
+            line.extend(splices[intron]["quantitations"])
+
+            print("\t".join([str(x) for x in line]), file=out)
 
 
 def quantitate_bam(bam, splices):
+    print("Quantitating",bam)
     # We first need to add a zero value to every splice in the dataset
     # then we can parse through the file and increment every time we
     # find a splice which is listed in the file.
@@ -34,7 +45,11 @@ def quantitate_bam(bam, splices):
 
 #### TESTING ONLY
 #    for read in inbam.fetch(until_eof=True):
-    for read in inbam.fetch("1",1,248956422):
+    for read_count,read in enumerate(inbam.fetch("1",1,248956422)):
+
+        if read_count % 1000000 == 0:
+            print("Processed",int(read_count/1000000),"million reads")
+
         # We don't want non unique mappings
         if read.mapping_quality < 20:
             continue
@@ -59,12 +74,9 @@ def quantitate_bam(bam, splices):
                 if not splice_lengths:
                     break
                 
-        # if splice_lengths:
-        #     print("Had left over splice lengths")
-        #     breakpoint()
-
 
 def read_splice_sites(file):
+    print("Extracting features from",file)
     infh = None
     if str(file).lower().endswith(".gz"):
         infh = gzip.open(file, "rt", encoding="utf8")
@@ -91,7 +103,7 @@ def read_splice_sites(file):
         sections = line.split("\t")
 
         if sections[0] != last_chr:
-            print("Reading features from ",sections[0])
+            print("Reading features from chr",sections[0])
             last_chr = sections[0]
             ## TESTING ONLY
             break
