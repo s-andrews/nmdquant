@@ -14,11 +14,11 @@ def main():
     for bam in options.bam:
         quantitate_bam(bam,splices)
 
-    write_output(splices, options.bam, options.outfile)
+    write_output(splices, options.bam, options.outfile, options.nounmeasured)
 
     print("Run complete")
 
-def write_output(splices, files, outfile):
+def write_output(splices, files, outfile, ignoreunmeasured):
     print("Writing output to",outfile)
     with open(outfile,"wt",encoding="utf8") as out:
         headers = ["INTRON","DIRECTION","GENE","NMD"]
@@ -27,7 +27,19 @@ def write_output(splices, files, outfile):
         print("\t".join(headers), file=out)
 
         for intron in splices.keys():
-            line = [intron,splices[intron]["direction"],"somegene",splices[intron]["nmd"]]
+
+            # If they've set --nounmeasured then we don't print lines
+            # where the quantitations are all zero
+            if ignoreunmeasured:
+                reject_line = True
+                for value in splices[intron]["quantitations"]:
+                    if value > 0:
+                        reject_line = False
+                        break
+                if reject_line:
+                    continue
+
+            line = [intron,splices[intron]["direction"],splices[intron]["gene"],splices[intron]["nmd"]]
             line.extend(splices[intron]["quantitations"])
 
             print("\t".join([str(x) for x in line]), file=out)
@@ -121,9 +133,13 @@ def read_splice_sites(file):
 
 
         if not annotations["transcript_id"] in transcripts:
+            gene_name=annotations["gene_id"]
+            if "gene_name" in annotations:
+                gene_name = annotations["gene_name"]
             transcripts[annotations["transcript_id"]] = {
-                "chromosome":sections[0],
+                "chromosome": sections[0],
                 "direction" : sections[6],
+                "gene" : gene_name,
                 "exons" : []
             }
             cds[annotations["transcript_id"]] = []
@@ -144,9 +160,9 @@ def read_splice_sites(file):
     # not be in another so any ambiguous ones are treated as valid
     splice_sites = {}
 
-    for transcipt_id in transcripts:
-        transcript_exons = transcripts[transcipt_id]["exons"]
-        cds_exons = cds[transcipt_id]
+    for transcript_id in transcripts:
+        transcript_exons = transcripts[transcript_id]["exons"]
+        cds_exons = cds[transcript_id]
 
         if not cds_exons:
             continue
@@ -157,7 +173,7 @@ def read_splice_sites(file):
         # We need to put the exons in order.  This is based on the
         # orientation of the gene
 
-        if transcripts[transcipt_id]["direction"] == "+":
+        if transcripts[transcript_id]["direction"] == "+":
             transcript_exons.sort(key=lambda x:x[0])
             for c in cds_exons:
                 if cds_start  is None or c[0] < cds_start:
@@ -176,18 +192,18 @@ def read_splice_sites(file):
 
         for i in range(1,len(transcript_exons)):
             is_nmd = False
-            if transcripts[transcipt_id]['direction'] == "+":
-                intron = f"{transcripts[transcipt_id]['chromosome']}:{transcript_exons[i-1][1]+1}-{transcript_exons[i][0]-1}"
+            if transcripts[transcript_id]['direction'] == "+":
+                intron = f"{transcripts[transcript_id]['chromosome']}:{transcript_exons[i-1][1]+1}-{transcript_exons[i][0]-1}"
                 if cds_end is None or transcript_exons[i-1][1]+1 > cds_end:
                     is_nmd = True
 
             else:
-                intron = f"{transcripts[transcipt_id]['chromosome']}:{transcript_exons[i][1]+1}-{transcript_exons[i-1][0]-1}"
+                intron = f"{transcripts[transcript_id]['chromosome']}:{transcript_exons[i][1]+1}-{transcript_exons[i-1][0]-1}"
                 if cds_end is None or transcript_exons[i][1]-1 < cds_end:
                     is_nmd = True
 
             if not intron in splice_sites:
-                splice_sites[intron] = {"nmd":is_nmd, "direction":transcripts[transcipt_id]['direction'], "quantitations":[]}
+                splice_sites[intron] = {"nmd":is_nmd, "direction":transcripts[transcript_id]['direction'], "quantitations":[], "gene": transcripts[transcript_id]['gene']}
 
             if not is_nmd:
                 splice_sites[intron]["nmd"] = False        
@@ -200,6 +216,7 @@ def get_options():
     parser.add_argument("gtf", help="GTF file of annotations")
     parser.add_argument("bam", nargs="+", help="BAM files to quantitate")
     parser.add_argument("--outfile",required=True, help="Output file name")
+    parser.add_argument("--nounmeasured", default=False, action="store_true", help="Don't report introns with no counts in any sample")
 
     return parser.parse_args()
 
