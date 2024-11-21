@@ -55,10 +55,7 @@ def quantitate_bam(bam, splices):
 
     inbam = pysam.AlignmentFile(bam,"rb")
 
-#### TESTING ONLY
-#    for read in inbam.fetch(until_eof=True):
-    for read_count,read in enumerate(inbam.fetch("1",1,248956422)):
-
+    for read_count,read in enumerate(inbam.fetch(until_eof=True)):
         if read_count % 1000000 == 0:
             print("Processed",int(read_count/1000000),"million reads")
 
@@ -104,7 +101,7 @@ def read_splice_sites(file):
     transcripts = {}
     cds = {}
 
-    last_chr = "1"
+    last_chr = ""
 
     for line in infh:
         line = line.strip()
@@ -117,8 +114,6 @@ def read_splice_sites(file):
         if sections[0] != last_chr:
             print("Reading features from chr",sections[0])
             last_chr = sections[0]
-            ## TESTING ONLY
-            break
 
         if not (sections[2] == "exon" or sections[2]=="CDS"):
             continue
