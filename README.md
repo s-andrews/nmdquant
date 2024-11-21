@@ -3,6 +3,8 @@ Quantitation of Nonsense Mediated Decay
 
 [Nonsense Mediated Decay](https://en.wikipedia.org/wiki/Nonsense-mediated_decay), or NMD for short, is a surveilance mechanims in cells which identifies and removes protein coding RNA molecules which contain a premature termination codon.  Any transcript which contains splice junctions, and where the coding sequence within the transcript does not extend beyond the final splice junction is susceptible to degradation via this mechanism.
 
+![NMD illustration](https://en.wikipedia.org/wiki/Nonsense-mediated_decay#/media/File:NMD_-_Nonsense-mediated_decay.png)
+
 Under some circumstances this process may be inhibited, leading to an increase in the number of non-productive transcripts within the mRNA population.
 
 The ```nmdquant``` program aims to quantitate the level of nonsense mediated decay target transcripts within a set of RNA-Seq samples.  It takes in BAM files of RNA-Seq data which have been mapped using a splicing aware mapper such as [Hisat2](http://daehwankimlab.github.io/hisat2/) or [STAR](https://github.com/alexdobin/STAR) and produces counts of reads crossing all splice boundaries in a supplied GTF annotation file.  The splice boundaries are annotated as to whether they are exclusively found in NMD target transcripts.
